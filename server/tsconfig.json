@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2022",              /* ECMAScript sürümünü belirtir (Node.js'in desteklediği en yeni sürümlerden biri) */
+    "module": "commonjs",           /* Modül kodunun hangi modül sisteminde oluşturulacağını belirtir (Node.js için 'commonjs' idealdir) */
+    "outDir": "./dist",             /* Derlenmiş JavaScript dosyalarının nereye kaydedileceğini belirtir */
+    "rootDir": "./src",             /* TypeScript kaynak dosyalarının nerede olduğunu belirtir */
+    "strict": true,                 /* Tüm katı tip denetleme seçeneklerini etkinleştirir */
+    "esModuleInterop": true,        /* CommonJS modüllerinden varsayılan içe aktarımları daha kolay hale getirir */
+    "skipLibCheck": true,           /* Deklarasyon dosyalarının tip denetlemesini atlar */
+    "forceConsistentCasingInFileNames": true, /* Aynı dosyanın birden fazla referansında tutarlı büyük/küçük harf kullanımını sağlar */
+    "resolveJsonModule": true,      /* .json uzantılı modülleri içe aktarmaya izin verir */
+    "sourceMap": true               /* Kaynak haritaları oluşturur (hata ayıklama için yararlıdır) */
+  },
+  "include": [
+    "src/**/*.ts"                   /* Derlenecek dosyaları belirtir (src klasöründeki tüm .ts dosyaları) */
+  ],
+  "exclude": [
+    "node_modules",                 /* Derlemeden hariç tutulacak klasörler */
+    "**/*.spec.ts"                  /* Test dosyalarını hariç tutar */
+  ]
+}
