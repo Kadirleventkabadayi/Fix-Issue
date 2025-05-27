@@ -1,138 +1,132 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAtom } from "jotai";
-import { userAtom } from "@/store/auth";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { exchangeCodeForToken, getGitHubUser } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 import {
   Container,
   Box,
   CircularProgress,
   Typography,
   Alert,
-  Button,
 } from "@mui/material";
 
-export default function AuthCallbackPage() {
-  const [, setUser] = useAtom(userAtom);
-  const [error, setError] = useState("");
-  const [debugInfo, setDebugInfo] = useState("");
-  const [, setLoading] = useState(true);
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleCallback = async () => {
+    const handleAuthCallback = async () => {
       try {
-        const code = searchParams.get("code");
-        const error = searchParams.get("error");
-
-        setDebugInfo(`Code: ${code}, Error: ${error}`);
-
-        if (error) {
-          setError("Authentication failed: " + error);
-          setLoading(false);
+        // Check for OAuth error in URL params
+        const errorParam = searchParams.get('error');
+        if (errorParam) {
+          console.error('OAuth error:', errorParam);
+          setError('Authentication failed. Please try again.');
+          setTimeout(() => router.push('/login'), 3000);
           return;
         }
 
-        if (!code) {
-          setError("No authorization code received.");
-          setLoading(false);
-          return;
-        }
+        // Check for the code parameter
+        const code = searchParams.get('code');
+        if (code) {
+          // Exchange the code for a session
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          
+          if (exchangeError) {
+            console.error('Error exchanging code for session:', exchangeError);
+            setError('Failed to complete authentication. Please try again.');
+            setTimeout(() => router.push('/login'), 3000);
+            return;
+          }
 
-        setDebugInfo("Exchanging code for token...");
+          // Check if we have a valid session after exchange
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('Error getting session:', sessionError);
+            setError('Authentication session error. Please try again.');
+            setTimeout(() => router.push('/login'), 3000);
+            return;
+          }
 
-        // Exchange code for access token
-        const token = await exchangeCodeForToken(code);
-
-        if (!token) {
-          setError(
-            "Failed to get access token. Check your environment variables."
-          );
-          setLoading(false);
-          return;
-        }
-
-        setDebugInfo("Getting user data...");
-
-        // Get user data
-        const userData = await getGitHubUser(token);
-
-        if (userData) {
-          setDebugInfo("Setting user and redirecting...");
-          setUser(userData);
-          localStorage.setItem("github_token", token);
-
-          // Small delay to ensure state is updated
-          setTimeout(() => {
-            router.push("/");
-          }, 100);
+          if (session) {
+            // Successfully authenticated, wait a moment for auth state to propagate
+            console.log('Authentication successful, redirecting to home...');
+            setTimeout(() => {
+              router.push('/');
+            }, 500);
+          } else {
+            // No session found, redirect to login
+            router.push('/login');
+          }
         } else {
-          setError("Failed to get user information.");
-          setLoading(false);
+          // No code parameter, this might be a direct access
+          router.push('/login');
         }
-      } catch (err) {
-        console.error("Auth callback error:", err);
-        setError("An error occurred during authentication: " + String(err));
-        setLoading(false);
+      } catch (error) {
+        console.error('Auth callback error:', error);
+        setError('An unexpected error occurred. Please try again.');
+        setTimeout(() => router.push('/login'), 3000);
       }
     };
 
-    handleCallback();
-  }, [searchParams, setUser, router]);
-
-  if (error) {
-    return (
-      <Container maxWidth="sm">
-        <Box
-          sx={{
-            marginTop: 8,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-          {debugInfo && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Debug: {debugInfo}
-            </Alert>
-          )}
-          <Button variant="contained" onClick={() => router.push("/login")}>
-            Try Again
-          </Button>
-        </Box>
-      </Container>
-    );
-  }
+    handleAuthCallback();
+  }, [router, searchParams]);
 
   return (
     <Container maxWidth="sm">
       <Box
-        sx={{
-          marginTop: 8,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        minHeight="100vh"
+        gap={2}
       >
-        <CircularProgress size={60} sx={{ mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          Completing sign in...
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Please wait while we verify your GitHub account.
-        </Typography>
-        {debugInfo && (
-          <Typography variant="caption" color="text.secondary">
-            {debugInfo}
-          </Typography>
+        {error ? (
+          <>
+            <Alert severity="error" sx={{ width: '100%' }}>
+              {error}
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              Redirecting to login page...
+            </Typography>
+          </>
+        ) : (
+          <>
+            <CircularProgress />
+            <Typography variant="h6">
+              Completing authentication...
+            </Typography>
+          </>
         )}
       </Box>
     </Container>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <Container maxWidth="sm">
+        <Box
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          justifyContent="center"
+          minHeight="100vh"
+          gap={2}
+        >
+          <CircularProgress />
+          <Typography variant="h6">
+            Loading...
+          </Typography>
+        </Box>
+      </Container>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

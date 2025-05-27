@@ -4,21 +4,18 @@ import { useEffect } from "react";
 import { useAtom } from "jotai";
 import { userAtom, sessionAtom, isLoadingAtom } from "@/store/auth";
 import { getCurrentUser, getCurrentSession, onAuthStateChange } from "@/lib/auth";
-import { useRouter } from "next/navigation";
-import { CircularProgress, Box } from "@mui/material";
 
-interface AuthGuardProps {
+interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-export default function AuthGuard({ children }: AuthGuardProps) {
-  const [user, setUser] = useAtom(userAtom);
+export default function AuthProvider({ children }: AuthProviderProps) {
+  const [, setUser] = useAtom(userAtom);
   const [, setSession] = useAtom(sessionAtom);
-  const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
-  const router = useRouter();
+  const [, setIsLoading] = useAtom(isLoadingAtom);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const initializeAuth = async () => {
       setIsLoading(true);
       
       try {
@@ -30,12 +27,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         if (currentSession && currentUser) {
           setUser(currentUser);
           setSession(currentSession);
-        } else {
-          router.push("/login");
         }
       } catch (error) {
-        console.error('Auth check error:', error);
-        router.push("/login");
+        console.error('Auth initialization error:', error);
       } finally {
         setIsLoading(false);
       }
@@ -43,35 +37,24 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
     // Set up auth state listener
     const { data: { subscription } } = onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      
       if (session) {
         setUser(session.user);
         setSession(session);
       } else {
         setUser(null);
         setSession(null);
-        router.push("/login");
       }
+      setIsLoading(false);
     });
 
-    checkAuth();
+    initializeAuth();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [setUser, setSession, setIsLoading, router]);
-
-  if (isLoading || !user) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
+  }, [setUser, setSession, setIsLoading]);
 
   return <>{children}</>;
 }

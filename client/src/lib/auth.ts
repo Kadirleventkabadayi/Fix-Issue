@@ -1,61 +1,86 @@
-export interface User {
-  id: string;
-  login: string;
-  name: string;
-  avatar_url: string;
-  email?: string;
+import { supabase } from './supabase'
+import type { User, Session } from '@supabase/supabase-js'
+
+export type { User, Session }
+
+// Helper to check if Supabase is properly configured
+const isSupabaseConfigured = () => {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL && 
+         process.env.NEXT_PUBLIC_SUPABASE_URL !== 'your_supabase_project_url' &&
+         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && 
+         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'your_supabase_anon_key'
 }
 
-// GitHub OAuth configuration
-export const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID!;
-export const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
-export const REDIRECT_URI =
-  process.env.NEXT_PUBLIC_REDIRECT_URI || "http://localhost:3000/auth/callback";
-
-export const getGitHubUser = async (token: string): Promise<User | null> => {
-  try {
-    const response = await fetch("https://api.github.com/user", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    });
-
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
+// GitHub OAuth using Supabase
+export const signInWithGitHub = async () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not properly configured. Please check your environment variables.')
   }
-};
 
-export const exchangeCodeForToken = async (
-  code: string
-): Promise<string | null> => {
-  try {
-    const response = await fetch("/api/auth/github", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ code }),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    return data.access_token || null;
-  } catch {
-    return null;
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  })
+  
+  if (error) {
+    console.error('Error signing in with GitHub:', error.message)
+    throw error
   }
-};
+  
+  return data
+}
 
-export const getGitHubAuthUrl = (): string => {
-  const params = new URLSearchParams({
-    client_id: GITHUB_CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
-    scope: "read:user user:email",
-    state: Math.random().toString(36).substring(2, 15), // CSRF protection
-  });
+export const signOut = async () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not properly configured.')
+  }
 
-  return `https://github.com/login/oauth/authorize?${params.toString()}`;
-};
+  const { error } = await supabase.auth.signOut()
+  
+  if (error) {
+    console.error('Error signing out:', error.message)
+    throw error
+  }
+}
+
+export const getCurrentUser = async (): Promise<User | null> => {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  
+  if (error) {
+    console.error('Error getting current user:', error.message)
+    return null
+  }
+  
+  return user
+}
+
+export const getCurrentSession = async (): Promise<Session | null> => {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  const { data: { session }, error } = await supabase.auth.getSession()
+  
+  if (error) {
+    console.error('Error getting current session:', error.message)
+    return null
+  }
+  
+  return session
+}
+
+// Listen for auth state changes
+export const onAuthStateChange = (callback: (event: string, session: Session | null) => void) => {
+  if (!isSupabaseConfigured()) {
+    // Return a mock subscription that can be unsubscribed
+    return { data: { subscription: { unsubscribe: () => {} } } }
+  }
+  
+  return supabase.auth.onAuthStateChange(callback)
+}

@@ -5,6 +5,7 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { Provider, useAtom } from "jotai";
 import { themeAtomWithPersistence } from "@/store/atoms";
 import { useMemo, useEffect } from "react";
+import AuthProvider from "@/components/Auth/AuthProvider";
 
 function ThemeProviderWrapper({ children }: { children: React.ReactNode }) {
   const [themeMode, setThemeMode] = useAtom(themeAtomWithPersistence);
@@ -59,9 +60,11 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Provider>
-          <ThemeProviderWrapper>
-            {children}
-          </ThemeProviderWrapper>
+          <AuthProvider>
+            <ThemeProviderWrapper>
+              {children}
+            </ThemeProviderWrapper>
+          </AuthProvider>
         </Provider>
       </body>
     </html>

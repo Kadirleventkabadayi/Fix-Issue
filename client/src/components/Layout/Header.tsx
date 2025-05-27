@@ -15,6 +15,7 @@ import { useAtom } from "jotai";
 import { userAtom } from "@/store/auth";
 import { themeAtomWithPersistence } from "@/store/atoms";
 import { useRouter } from "next/navigation";
+import { signOut } from "@/lib/auth";
 import Link from "next/link";
 
 export default function Header() {
@@ -22,11 +23,16 @@ export default function Header() {
   const [themeMode, setThemeMode] = useAtom(themeAtomWithPersistence);
   const router = useRouter();
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("github_token");
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setUser(null);
+      router.push("/login");
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
+  
   const toggleTheme = () => {
     setThemeMode(themeMode === "light" ? "dark" : "light");
   };
@@ -58,8 +64,8 @@ export default function Header() {
                 <Button color="inherit">Profile</Button>
               </Link>
               <Avatar
-                src={user.avatar_url}
-                alt={user.name}
+                src={user.user_metadata?.avatar_url}
+                alt={user.user_metadata?.full_name || user.email}
                 sx={{ width: 32, height: 32 }}
               />
               <Button color="inherit" onClick={handleLogout}>
